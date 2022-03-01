@@ -30,11 +30,11 @@ function mainMenu() {
             choices: [
                 "View All Departments",
                 "View All Roles",
-                "view All Employees",
+                "View All Employees",
                 "Add a Department",
                 "Add a Role",
                 "Add an Employee",
-                "Update ab Employee Role",
+                "Update an Employee Role",
                 "Exit"
             ]
         }
@@ -63,7 +63,7 @@ function mainMenu() {
                     console.log("Adding a new department")
                     addDepartment()
                     break;
-                case "Add a role":
+                case "Add a Role":
                     // start asking for the info about the new role
                     console.log("Adding a new role")
                     addRole()
@@ -72,6 +72,11 @@ function mainMenu() {
                     // start asking for the info about the new employee
                     console.log("Adding a new employee")
                     addEmployee()
+                    break;
+                case "Update an Employee Role":
+                    // updating employee role
+                    console.log("Updating employee role")
+                    updateEmployee()
                     break;
 
                 default:
@@ -118,43 +123,48 @@ function addDepartment() {
 }
 function addRole() {
 
-    connection.query("SELECT*FROM department;", function (err, res) {
+    connection.query("SELECT * FROM department;", function (err, res) {
         let departmentChoice = res.map(function (res) {
-            return res['title'];
+            // return res['name'];
+            return {
+                value: res["id"],
+                name: res["name"]
+            }
         })
-    });
-    inquirer.prompt([
-        {
-            type: "input",
-            name: "role_title",
-            message: "What is the title of this new role?"
-        },
-        {
-            type: "input",
-            name: "role_salary",
-            message: "What is the salary of this new role?"
-        },
-        // need to double check
-        {
-            type: "list",
-            name: "role_department",
-            message: "What is the department of this new role?",
-            choices: departmentChoice
 
-        },
-    ])
-        .then(answer => {
-            connection.query(
-                `
-                INSERT INTO role (title) VALUES ("${answer.role_title}"); 
-                INSERT INTO role (salary) VALUES ("${answer.role_salary}");
-                INSERT INTO role (department_id) VALUES ("${answer.role_department}"); 
-                `
-                , function (err, data) {
-                    console.log("Role added successfully!");
-                    mainMenu();
-                })
-        })
+        inquirer.prompt([
+            {
+                type: "input",
+                name: "role_title",
+                message: "What is the title of this new role?"
+            },
+            {
+                type: "input",
+                name: "role_salary",
+                message: "What is the salary of this new role?"
+            },
+            // need to double check
+            {
+                type: "list",
+                name: "role_department",
+                message: "What is the department of this new role?",
+                choices: departmentChoice
+
+            },
+        ])
+            .then(answer => {
+                connection.query(
+                    `
+            INSERT INTO role (title, salary, department_id) VALUES ("${answer.role_title}","${answer.role_salary}","${answer.role_department}" ); 
+       
+            `
+                    , function (err, data) {
+                        if (err) console.log(err);
+                        console.log("Role added successfully!");
+                        mainMenu();
+                    })
+            })
+    });
 
 
 }
@@ -162,13 +172,26 @@ function addEmployee() {
 
     connection.query(`SELECT*FROM role;`, function (err, res) {
         let roleChoice = res.map(function (res) {
-            return res['title'];
+            // return res['title'];
+            return {
+                value: res["id"],
+                name: res["title"]
+            }
         });
         let roles = res;
-        connection.query(`SELECT employees.first_name, employees.last_name, employees.role_id, roles.title FROM employees INNER JOIN roles ON employees.role_id = roles.id WHERE employees.is_mangr=TRUE;`, function (err, res) {
-            let managerChoices = res.map(function (res) {
-                return { name: res.first_name + ' ' + res.last_name + ": " + res.title, value: res.role_id };
-            });
+        connection.query(`SELECT * FROM employee WHERE manager_id IS NULL;`, function (err, res) {
+            let managerChoices = [
+                {
+                    name: "no manager found!",
+                    value: null
+                }
+            ]
+            console.log(res)
+            if (res) {
+                managerChoices = res.map(function (res) {
+                    return { name: res.first_name + ' ' + res.last_name + ": ", value: res.id };
+                });
+            }
 
 
             inquirer.prompt([
@@ -187,27 +210,28 @@ function addEmployee() {
                     type: "list",
                     name: "employee_role_id",
                     message: "What is the role id of the new employee?",
-                    choice: roleChoice
+                    choices: roleChoice
                 },
                 // need to double check.
                 {
                     type: "list",
                     name: "employee_manager_id",
                     message: "What is the manager id of the new employee?",
-                    choice: managerChoices
+                    choices: managerChoices
                 },
             ])
                 .then(answer => {
                     connection.query(
                         `
-                INSERT INTO employee (first_name) VALUES ("${answer.employee_first_name}"); 
-                INSERT INTO employee (last_name) VALUES ("${answer.employee_last_name}"); 
-                INSERT INTO employee (role_id) VALUES ("${employee_role_id}");
-                INSERT INTO employee (manager_id) VALUES ("${answer.employee_manager_id}"); 
+                INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES ("${answer.employee_first_name}","${answer.employee_last_name}","${answer.employee_role_id}",${answer.employee_manager_id}); 
+                
                 `
                         , function (err, data) {
-                            console.log("Employee added successfully!");
-                            mainMenu();
+                            if (err) console.log(err)
+                            else {
+                                console.log("Employee added successfully!");
+                                mainMenu();
+                            }
                         })
                 })
 
@@ -215,8 +239,39 @@ function addEmployee() {
         });
     });
 }
+function updateEmployee() {
+
+    inquirer.prompt([
+        {
+            type: "input",
+            name: "role_id",
+            message: "What is the new role id?"
+        },
+        {
+            type: "input",
+            name: "id",
+            message: "What is the id of the employee?"
+        },
+
+    ])
 
 
+        .then(answer => {
+            connection.query(
+                `
+            UPDATE employee SET role_id = ${answer.role_id} WHERE id= ${answer.id};  
+    
+    `
+                , function (err, data) {
+                    if (err) console.log(err)
+                    else {
+                        console.log("Role update successfully!");
+                        mainMenu();
+                    }
+                })
+        })
+
+}
 
 
 mainMenu();
